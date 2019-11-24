@@ -6,7 +6,7 @@ EasyPHP Devserver: http://easyphp.org
 
 What the script does:
 
-- Download the latest `cacert.pem` file and place it into the deverser's folder
+- Download the latest `cacert.pem` file and place it into the devserver's folder
 - Edit the php.ini of each PHP binary installed in the server
 - Enables openssl, including the certificate configuration
 - Enables additional extensions
