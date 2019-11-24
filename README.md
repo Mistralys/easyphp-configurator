@@ -15,3 +15,11 @@ What the script does:
 - Sets max memory to 600M
 
 These are my personal developer preferences, but they can be changed in the `Configurator` class.
+
+## Installation
+
+# Clone the project somewhere in your Webroot
+# Run `composer update` to install dependencies
+# Rename `config.dist.php` to `config.php`
+# Set the correct path to your EasyPHP folder in `config.php`
+# Run the `index.php` either in your browser or via command line
