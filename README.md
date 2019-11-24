@@ -18,8 +18,8 @@ These are my personal developer preferences, but they can be changed in the `Con
 
 ## Installation
 
-# Clone the project somewhere in your Webroot
-# Run `composer update` to install dependencies
-# Rename `config.dist.php` to `config.php`
-# Set the correct path to your EasyPHP folder in `config.php`
-# Run the `index.php` either in your browser or via command line
+1. Clone the project somewhere in your Webroot
+1. Run `composer update` to install dependencies
+1. Rename `config.dist.php` to `config.php`
+1. Set the correct path to your EasyPHP folder in `config.php`
+1. Run the `index.php` either in your browser or via command line
