@@ -23,3 +23,5 @@ These are my personal developer preferences, but they can be changed in the `Con
 1. Rename `config.dist.php` to `config.php`
 1. Set the correct path to your EasyPHP folder in `config.php`
 1. Run the `index.php` either in your browser or via command line
+
+After this, run the script whenever you add new PHP binaries.
