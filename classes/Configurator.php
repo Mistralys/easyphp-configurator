@@ -5,19 +5,26 @@ declare(strict_types=1);
 namespace EPConf;
 
 use AppUtils\FileHelper;
+use AppUtils\IniHelper;
 
 class Configurator
 {
-    const ERROR_EASYPHP_FOLDER_NOT_FOUND = 41701;
+    public const ERROR_EASYPHP_FOLDER_NOT_FOUND = 41701;
     
    /**
     * @var string
     */
-    protected $easyPHPFolder;
-    
-    protected $errors = array();
-    
-    protected $iniFiles = array();
+    protected string $easyPHPFolder;
+
+    /**
+     * @var Configurator_Error[]
+     */
+    protected array $errors = array();
+
+    /**
+     * @var array<string,float>
+     */
+    protected array $iniFiles = array();
     
    /**
     * @param string $easyPHPFolder The absolute path to the EasyPHP install folder.
@@ -37,31 +44,68 @@ class Configurator
                 self::ERROR_EASYPHP_FOLDER_NOT_FOUND
             );
         }
+
+        $this->downloadCertificateFile();
+        $this->detectINIFiles();
         
-        $pem = FileHelper::downloadFile('https://curl.haxx.se/ca/cacert.pem');
-        FileHelper::saveFile($this->easyPHPFolder.'/cacert.pem', $pem);
-        
-        $this->log('cacert.pem downloaded and saved.');
-        
-        $inis = \AppUtils\FileHelper::createFileFinder($this->easyPHPFolder.'/eds-binaries/php')
-        ->includeExtensions(array('ini'))
-        ->makeRecursive()
-        ->getAll();
-        
-        foreach($inis as $file) 
+        foreach($this->iniFiles as $file => $version)
         {
-            $name = basename($file);
-            if($name == 'php.ini') {
-                $this->iniFiles[] = $file;
-            }
-        }
-        
-        foreach($this->iniFiles as $file)
-        {
-            $this->processFile($file);
+            $this->processFile($file, $version);
         }
         
         return empty($this->errors);
+    }
+
+    private function detectINIFiles() : void
+    {
+        $inis = FileHelper::createFileFinder($this->easyPHPFolder.'/eds-binaries/php')
+            ->includeExtensions(array('ini'))
+            ->makeRecursive()
+            ->getAll();
+
+        foreach($inis as $file)
+        {
+            $this->initINIFile($file);
+        }
+    }
+
+    private function initINIFile(string $file) : void
+    {
+        $name = basename($file);
+
+        if($name !== 'php.ini')
+        {
+            return;
+        }
+
+        $version = $this->detectVersion(dirname($file));
+
+        $this->iniFiles[$file] = $version;
+    }
+
+    private function detectVersion(string $dir) : float
+    {
+        $snapshotFile = $dir.'/snapshot.txt';
+
+        $lines = FileHelper::readLines($snapshotFile);
+
+        foreach($lines as $line)
+        {
+            if(strpos($line, 'Version:') === 0)
+            {
+                return (float)trim(str_replace('Version:', '', $line));
+            }
+        }
+
+        die('No version detected in ['.$snapshotFile.'].');
+    }
+
+    private function downloadCertificateFile() : void
+    {
+        $pem = FileHelper::downloadFile('https://curl.haxx.se/ca/cacert.pem');
+        FileHelper::saveFile($this->easyPHPFolder.'/cacert.pem', $pem);
+
+        $this->log('cacert.pem downloaded and saved.');
     }
     
     protected function addError(string $message, int $code) : bool
@@ -73,48 +117,53 @@ class Configurator
         
         return false;
     }
-    
-    protected $extensions = array(
-        'php_bz2' => true,
-        'php_curl' => true,
-        'php_fileinfo' => false,
-        'php_gd2' => true,
-        'php_gettext' => true,
-        'php_gmp' => false,
-        'php_intl' => false,
-        'php_imap' => false,
-        'php_interbase' => false,
-        'php_ldap' => false,
-        'php_mbstring' => true,
-        'php_exif' => true, // Must be after mbstring as it depends on it
-        'php_mysqli' => true,
-        'php_oci8_12c' => false,
+
+    /**
+     * @var array<string,bool>
+     */
+    protected array $extensions = array(
+        'bz2' => true,
+        'curl' => true,
+        'ftp' => true,
+        'fileinfo' => false,
+        'gd2' => true,
+        'gettext' => true,
+        'gmp' => false,
+        'intl' => false,
+        'imap' => false,
+        'interbase' => false,
+        'ldap' => false,
+        'mbstring' => true,
+        'exif' => true, // Must be after mbstring as it depends on it
+        'mysqli' => true,
+        'oci8_12c' => false,
         'odbc' => false,
-        'php_openssl' => true,
-        'php_pdo_firebird' => false,
-        'php_pdo_mysql' => true,
-        'php_pdo_oci' => false,
-        'php_pdo_odbc' => false,
-        'php_pdo_pgsql' => false,
-        'php_pdo_sqlite' => true,
-        'php_pgsql' => false,
-        'php_shmop' => false,
-        'php_snmp' => false,
-        'php_soap' => false,
-        'php_sockets' => true,
-        'php_sqlite3' => true,
-        'php_tidy' => false,
-        'php_xmlrpc' => false,
-        'php_xsl' => true,
+        'openssl' => true,
+        'pdo_firebird' => false,
+        'pdo_mysql' => true,
+        'pdo_oci' => false,
+        'pdo_odbc' => false,
+        'pdo_pgsql' => false,
+        'pdo_sqlite' => true,
+        'pgsql' => false,
+        'shmop' => false,
+        'snmp' => false,
+        'soap' => false,
+        'sockets' => true,
+        'sqlite3' => true,
+        'tidy' => false,
+        'xmlrpc' => false,
+        'xsl' => true,
     );
     
-    protected function processFile(string $file)
+    protected function processFile(string $file, float $version) : void
     {
-        $parser = \AppUtils\IniHelper::createFromFile($file);
+        $parser = IniHelper::createFromFile($file);
         
         // save a copy of the original if this is the first time
         // we edit it.
-        if(!$parser->sectionExists('EPConf')) {
+        if(!$parser->sectionExists('EPConf'))
+        {
             copy($file, $file.'.epconf.orig');
         }
             
@@ -123,7 +172,7 @@ class Configurator
         $parser->setValue('PHP/memory_limit', '600M');
         $parser->setValue('PHP/upload_max_filesize', '200M');
         $parser->setValue('PHP/post_max_size', '200M');
-        $parser->setValue('PHP/extension', $this->getExtensions());
+        $parser->setValue('PHP/extension', $this->getExtensions($version));
         $parser->setValue('curl/curl.cainfo', $this->easyPHPFolder.'\cacert.pem');
         $parser->setValue('openssl/openssl.cafile', $this->easyPHPFolder.'\cacert.pem');
         
@@ -135,26 +184,37 @@ class Configurator
         $this->log('php.ini updated in '.$name);
     }
     
-    protected function log(string $message)
+    protected function log(string $message) : void
     {
         echo $message.PHP_EOL;
     }
-    
-    protected function getExtensions()
+
+    /**
+     * @return string[]
+     */
+    protected function getExtensions(float $phpVersion) : array
     {
         $keep = array();
+        $prefix = '';
+        if($phpVersion < 7.4)
+        {
+            $prefix = 'php_';
+        }
         
         foreach($this->extensions as $name => $enabled)
         {
             if($enabled) {
-                $keep[] = $name; 
+                $keep[] = $prefix.$name;
             }
         }
         
         return $keep;
     }
-    
-    public function getErrors()
+
+    /**
+     * @return Configurator_Error[]
+     */
+    public function getErrors() : array
     {
         return $this->errors;
     }
